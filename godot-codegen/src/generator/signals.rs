@@ -25,23 +25,37 @@ pub struct SignalCodegen {
 pub fn make_class_signals(
     class: &Class,
     signals: &[ClassSignal],
-    _ctx: &mut Context,
+    ctx: &mut Context,
 ) -> SignalCodegen {
     let all_params: Vec<SignalParams> = signals
         .iter()
         .map(|s| SignalParams::new(&s.parameters))
         .collect();
 
-    // TokenStream is None if no signals are defined.
-    let (signal_collection_struct, collection_struct_name) =
-        make_signal_collection(class, signals, &all_params);
+    let class_name = class.name();
+
+    // If no signals are defined:
+    // - struct is None
+    // - collection name is the nearest base that *has* signals
+    let (signal_collection_struct, collection_struct_name, has_own_signals);
+    if signals.is_empty() {
+        // If it's None, that means the class is Object -> base collection name will never be used.
+        collection_struct_name = ctx
+            .find_nearest_base_with_signals(class_name)
+            .map_or_else(|| ident("never_used"), |ty| ty.rust_ty);
+
+        signal_collection_struct = TokenStream::new();
+        has_own_signals = false;
+    } else {
+        (signal_collection_struct, collection_struct_name) =
+            make_signal_collection(class, signals, &all_params);
+        has_own_signals = true;
+    };
 
     let signal_types = signals
         .iter()
         .zip(all_params.iter())
         .map(|(signal, params)| make_signal_individual_struct(signal, params));
-
-    let class_name = class.name();
 
     let with_signals_impl = make_with_signals_impl(class_name, &collection_struct_name);
     let deref_impl = make_deref_impl(class_name, &collection_struct_name);
@@ -69,7 +83,7 @@ pub fn make_class_signals(
 
     SignalCodegen {
         signal_code: code,
-        has_own_signals: signal_collection_struct.is_some(),
+        has_own_signals,
     }
 }
 
@@ -107,13 +121,11 @@ fn make_signal_collection(
     class: &Class,
     signals: &[ClassSignal],
     params: &[SignalParams],
-) -> (Option<TokenStream>, Ident) {
+) -> (TokenStream, Ident) {
+    debug_assert!(!signals.is_empty()); // checked outside
+
     let class_name = class.name();
     let collection_struct_name = make_collection_name(class_name);
-
-    if signals.is_empty() {
-        return (None, collection_struct_name);
-    }
 
     let provider_methods = signals.iter().zip(params).map(|(sig, params)| {
         let signal_name_str = &sig.name;
@@ -148,7 +160,7 @@ fn make_signal_collection(
         }
     };
 
-    (Some(code), collection_struct_name)
+    (code, collection_struct_name)
 }
 
 fn make_deref_impl(class_name: &TyName, collection_struct_name: &Ident) -> TokenStream {
