@@ -284,19 +284,21 @@ impl<'a> Context<'a> {
     }
 
     /// Walks up in the hierarchy, and returns the first (nearest) base class which declares at least 1 signal.
-    pub fn find_nearest_base_with_signals(&self, class_name: &TyName) -> Option<TyName> {
+    ///
+    /// Always returns a result, as `Object` (the root) itself declares signals.
+    pub fn find_nearest_base_with_signals(&self, class_name: &TyName) -> TyName {
         let tree = self.inheritance_tree();
 
         let mut class = class_name.clone();
         while let Some(base) = tree.direct_base(&class) {
             if self.classes_with_signals.contains(&base) {
-                return Some(base);
+                return base;
             } else {
                 class = base;
             }
         }
 
-        None
+        panic!("Object (root) should always have signals")
     }
 
     pub fn notification_constants(&'a self, class_name: &TyName) -> Option<&'a Vec<(Ident, i32)>> {

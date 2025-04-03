@@ -34,21 +34,19 @@ pub fn make_class_signals(
 
     let class_name = class.name();
 
-    // If no signals are defined:
-    // - struct is None
-    // - collection name is the nearest base that *has* signals
-    let (signal_collection_struct, collection_struct_name, has_own_signals);
+    // If no signals are defined in current class, walk up until we find some.
+    let (own_collection_struct, nearest_collection_name, has_own_signals);
     if signals.is_empty() {
-        // If it's None, that means the class is Object -> base collection name will never be used.
-        collection_struct_name = ctx
-            .find_nearest_base_with_signals(class_name)
-            .map_or_else(|| ident("never_used"), |ty| ty.rust_ty);
-
-        signal_collection_struct = TokenStream::new();
+        // Use the nearest base class that *has* signals, and store its collection name.
+        let nearest_class = ctx.find_nearest_base_with_signals(class_name);
+        nearest_collection_name = make_collection_name(&nearest_class);
+        own_collection_struct = TokenStream::new();
         has_own_signals = false;
     } else {
-        (signal_collection_struct, collection_struct_name) =
-            make_signal_collection(class, signals, &all_params);
+        let (code, name) = make_signal_collection(class, signals, &all_params);
+
+        own_collection_struct = code;
+        nearest_collection_name = name;
         has_own_signals = true;
     };
 
@@ -57,8 +55,8 @@ pub fn make_class_signals(
         .zip(all_params.iter())
         .map(|(signal, params)| make_signal_individual_struct(signal, params));
 
-    let with_signals_impl = make_with_signals_impl(class_name, &collection_struct_name);
-    let deref_impl = make_deref_impl(class_name, &collection_struct_name);
+    let with_signals_impl = make_with_signals_impl(class_name, &nearest_collection_name);
+    let deref_impl = make_deref_impl(class_name, &nearest_collection_name);
 
     let code = quote! {
         #[cfg(since_api = "4.2")]
@@ -72,7 +70,7 @@ pub fn make_class_signals(
             use super::*;
 
             // These may be empty if the class doesn't define any signals itself.
-            #signal_collection_struct
+            #own_collection_struct
             #( #signal_types )*
 
             // These are always present.
