@@ -118,7 +118,8 @@ fn make_with_signals_impl(
             #[doc(hidden)]
             fn __signals_from_external(external: &mut Gd<Self>) -> Self::SignalCollection<'_> {
                 Self::SignalCollection {
-                    __gd: external,
+                    //__gd: external,
+                    __gd: todo!(),
                 }
             }
         }
@@ -170,7 +171,8 @@ fn make_signal_collection(
     let code = quote! {
         #[doc = #collection_docs]
         pub struct #collection_struct_name<'c> {
-            __gd: &'c mut Gd<#class_name>,
+            #[doc(hidden)]
+            pub __gd: &'c mut Gd<#class_name>,
         }
 
         impl<'c> #collection_struct_name<'c> {

@@ -215,7 +215,7 @@ impl SignalCollection {
             // visibility that exceeds the class visibility). So, we can as well declare the visibility here.
             #vis_marker fn #signal_name(self) -> #individual_struct_name<'c> {
                 #individual_struct_name {
-                    typed: ::godot::register::TypedSignal::new(self.__internal_obj, #signal_name_str)
+                    __typed: ::godot::register::TypedSignal::new(self.__internal_obj, #signal_name_str)
                 }
             }
         });
@@ -262,14 +262,14 @@ fn make_signal_individual_struct(details: &SignalDetails) -> TokenStream {
         #[doc(hidden)] // Signal struct is hidden, but the method returning it is not (IDE completion).
         #vis_marker struct #individual_struct_name<'a> {
             #[doc(hidden)]
-            typed: ::godot::register::TypedSignal<'a, #class_name, #param_tuple>,
+            __typed: ::godot::register::TypedSignal<'a, #class_name, #param_tuple>,
         }
 
         // Concrete convenience API is macro-based; many parts are delegated to TypedSignal via Deref/DerefMut.
         #(#signal_cfg_attrs)*
         impl #individual_struct_name<'_> {
             pub fn emit(&mut self, #emit_params) {
-                self.typed.emit_tuple((#( #param_names, )*));
+                self.__typed.emit_tuple((#( #param_names, )*));
             }
         }
 
@@ -278,14 +278,14 @@ fn make_signal_individual_struct(details: &SignalDetails) -> TokenStream {
             type Target = ::godot::register::TypedSignal<'c, #class_name, #param_tuple>;
 
             fn deref(&self) -> &Self::Target {
-                &self.typed
+                &self.__typed
             }
         }
 
         #(#signal_cfg_attrs)*
         impl std::ops::DerefMut for #individual_struct_name<'_> {
             fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.typed
+                &mut self.__typed
             }
         }
     }

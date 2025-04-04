@@ -353,10 +353,22 @@ mod emitter {
 
         #[cfg(since_api = "4.2")]
         pub fn connect_signals_internal(&mut self, tracker: Rc<Cell<i64>>) {
+            use godot::obj::WithBaseField;
+            let this = self.to_gd();
+
             let mut sig = self.signals().signal_int();
-            sig.connect_self(Self::self_receive);
+
+            // sig.connect(self, Self::self_receive);
+            sig.connect(&this, Self::self_receive);
+            // sig.connect_self( Self::self_receive);
             sig.connect_g(Self::self_receive_static);
             sig.connect_g(move |i| tracker.set(i));
+
+            connect! {
+                signal_a => self . Self::self_receive,
+                signal_b => Self::self_receive_static,
+                signal_c => move |i| tracker.set(i),
+            }
         }
 
         #[cfg(since_api = "4.2")]
